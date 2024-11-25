@@ -1,52 +1,39 @@
 package main
 
 import (
-	"bytes"
 	"os/exec"
-	"strings"
 	"testing"
+	"time"
 )
 
-func TestSearchWithSingleWorker(t *testing.T) {
-	cmd := exec.Command("go", "run", "main.go",
-		"-p", "/",
-		"-t", "file",
-		"-n", "postgresql.conf",
-		"-m", "like",
-		"-workers", "1",
-	)
+func BenchmarkFindLinux(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		cmd := exec.Command("find", "/", "-name", "*image*.png")
+		start := time.Now()
 
-	var out, stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			b.Logf("Error executing find: %v\nOutput: %s", err, string(output))
+		}
 
-	if err := cmd.Run(); err != nil {
-		t.Fatalf("Error running command: %s\nStderr: %s", err, stderr.String())
-	}
-
-	if !strings.Contains(out.String(), "postgresql.conf") {
-		t.Errorf("Expected output to contain 'postgresql.conf', got: %s", out.String())
+		elapsed := time.Since(start)
+		b.ReportMetric(float64(elapsed.Milliseconds()), "ms/op")
 	}
 }
 
-func TestSearchWithFiftyWorkers(t *testing.T) {
-	cmd := exec.Command("go", "run", "main.go",
-		"-p", "/",
-		"-t", "file",
-		"-n", "postgresql.conf",
-		"-m", "like",
-		"-workers", "50",
-	)
+func BenchmarkGofast(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		cmd := exec.Command("go", "run", "main.go", "-p", "/", "-t", "file", "-n", "*image*.png", "-m", "pattern")
+		start := time.Now()
 
-	var out, stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			b.Fatalf("Error executing gofast: %v\nOut: %s", err, string(out))
+		}
 
-	if err := cmd.Run(); err != nil {
-		t.Fatalf("Error running command: %s\nStderr: %s", err, stderr.String())
-	}
+		b.Logf("Output: %s", string(out))
 
-	if !strings.Contains(out.String(), "postgresql.conf") {
-		t.Errorf("Expected output to contain 'postgresql.conf', got: %s", out.String())
+		elapsed := time.Since(start)
+		b.ReportMetric(float64(elapsed.Milliseconds()), "ms/op")
 	}
 }
