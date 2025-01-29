@@ -22,6 +22,10 @@ var (
 	workers   int
 )
 
+const (
+	VERSION = "1.1.2"
+)
+
 func init() {
 	flag.StringVar(&startPath, "p", "/", "Starting point for the search (required parameter)")
 	flag.StringVar(&fileType, "t", "file", "Type of search: 'file' or 'dir' (required parameter)")
@@ -33,22 +37,47 @@ func init() {
 }
 
 func main() {
-	if os.Args[1] == "logs" {
-		f, err := os.Open(logs.LOG_FILENAME)
-		if err != nil {
-			fmt.Println(err)
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "logs":
+			if len(os.Args) > 2 && os.Args[2] == "clear" {
+				err := os.Truncate(logs.LOG_FILENAME, 0)
+				if err != nil {
+					fmt.Println("Error clearing logs:", err)
+					return
+				}
+				fmt.Println("Logs cleared successfully")
+				return
+			}
+
+			f, err := os.Open(logs.LOG_FILENAME)
+			if err != nil {
+				fmt.Println("Error opening log file:", err)
+				return
+			}
+			defer f.Close()
+
+			finfo, err := f.Stat()
+			if err != nil {
+				fmt.Println("Error getting log file info:", err)
+				return
+			}
+
+			content := make([]byte, finfo.Size())
+			_, err = f.Read(content)
+			if err != nil {
+				fmt.Println("Error reading log file:", err)
+				return
+			}
+			fmt.Println(string(content))
+			return
+
+		case "version":
+			fmt.Println("gofast version:", VERSION)
 			return
 		}
-		finfo, _ := os.Stat(logs.LOG_FILENAME)
-		content := make([]byte, finfo.Size())
-		_, err = f.Read(content)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		fmt.Println(string(content))
-		return
 	}
+
 	flag.Parse()
 
 	if name == "" {

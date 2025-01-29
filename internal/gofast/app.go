@@ -73,7 +73,7 @@ func (a *gofast) run() error {
 	wgApp.Wait()
 	close(a.taskCh)
 
-	wgWP.Wait() // Ждём завершения WorkerPool перед завершением программы
+	wgWP.Wait()
 
 	return nil
 }
