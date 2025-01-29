@@ -2,15 +2,8 @@
 
 The purpose of this utility is to overtake the `find` utility.
 
-## Run
 
-Run with command:
-
-```sh
-sudo go run path/to/main.go -p / -t file -n "filename" -m "exact"
-```
-
-Use `sudo` to make the search full-fledged.
+## Flags
 
 ```go
 flag.StringVar(&startPath, "p", "/", "Starting point for the search (required parameter)")
@@ -22,22 +15,57 @@ flag.StringVar(&method, "m", "like", "Search method, e.g., 'exact' or 'pattern'"
 ## Install
 
 You can install the application using the command:
+
 ```sh
 go install github.com/0x0FACED/gofast/cmd/gofast@latest
 ```
 
-## Usage after install
-
-### Run
+## Run
 
 ```sh
 gofast -p / -t [file | dir] -n "filenameOrDir" -m [exact | pattern]
+```
+
+## Alternative methods
+
+### Clone, build and run
+
+You can clone repo, build executable file and run with the following steps:
+
+1. Clone repo using HTTPS:
+
+```sh
+git clone https://github.com/0x0FACED/gofast.git
+```
+
+2. Build executable
+
+```sh
+go build -o gofast cmd/gofast/main.go
+```
+
+3. Run
+
+```sh
+./gofast -p / -t file -n "gofast" -m exact
+```
+
+### Check version
+
+```sh
+gofast version
 ```
 
 ### Read logs
 
 ```sh
 gofast logs
+```
+
+### Clear logs
+
+```sh
+gofast logs clear
 ```
 
 ### Work in progress
