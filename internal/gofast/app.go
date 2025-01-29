@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/0x0FACED/gofast/configs"
+	"github.com/0x0FACED/gofast/internal/logs"
 	"github.com/0x0FACED/gofast/internal/wp"
 )
 
@@ -26,33 +26,33 @@ type gofast struct {
 	start    string
 	fileType string
 
-	cfg configs.AppConfig
+	logger *logs.Logger
 }
 
-func new(wp *wp.WorkerPool, t chan string, r chan string, e chan error, d chan struct{}) *gofast {
+func newApp(wp *wp.WorkerPool, t chan string, r chan string, e chan error, d chan struct{}) *gofast {
+	l, err := logs.New()
+	if err != nil {
+		panic(err)
+	}
 	return &gofast{
 		wp:       wp,
 		resultCh: r,
 		taskCh:   t,
 		errorCh:  e,
 		done:     d,
+		logger:   l,
 	}
 }
 
 func Start(start, fileType, name, method string, workers int) error {
-	cfg, err := configs.Load()
-	if err != nil {
-		return err
-	}
-
-	taskCh := make(chan string, cfg.ResultChanSize)
-	resCh := make(chan string, cfg.ResultChanSize)
-	errCh := make(chan error, cfg.ErrorsChanSize)
+	taskCh := make(chan string, 500)
+	resCh := make(chan string, 500)
+	errCh := make(chan error, 50)
 	done := make(chan struct{})
 
 	wp := wp.New(workers, taskCh, resCh, errCh, done, method, name)
 
-	app := new(wp, taskCh, resCh, errCh, done)
+	app := newApp(wp, taskCh, resCh, errCh, done)
 	app.start = start
 	app.fileType = fileType
 
@@ -87,11 +87,13 @@ func (a *gofast) listen() {
 				continue
 			}
 			log.Println(res)
-		case _, ok := <-a.errorCh: // ignore
+			a.logger.Info(res) // write info log
+		case err, ok := <-a.errorCh: // ignore
 			if !ok {
 				a.errorCh = nil
 				continue
 			}
+			a.logger.Error(err)
 		case <-a.done:
 			log.Println("Worker finished")
 		}
