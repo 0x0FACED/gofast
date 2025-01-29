@@ -16,17 +16,14 @@ const (
 )
 
 type gofast struct {
-	wp *wp.WorkerPool
-
-	taskCh   chan<- string // write to
-	resultCh chan string   // read from
-	errorCh  chan error    // read from
-	done     chan struct{} // read from
-
+	wp       *wp.WorkerPool
+	taskCh   chan string
+	resultCh chan string
+	errorCh  chan error
+	done     chan struct{}
 	start    string
 	fileType string
-
-	logger *logs.Logger
+	logger   *logs.Logger
 }
 
 func newApp(wp *wp.WorkerPool, t chan string, r chan string, e chan error, d chan struct{}) *gofast {
@@ -36,8 +33,8 @@ func newApp(wp *wp.WorkerPool, t chan string, r chan string, e chan error, d cha
 	}
 	return &gofast{
 		wp:       wp,
-		resultCh: r,
 		taskCh:   t,
+		resultCh: r,
 		errorCh:  e,
 		done:     d,
 		logger:   l,
@@ -51,7 +48,6 @@ func Start(start, fileType, name, method string, workers int) error {
 	done := make(chan struct{})
 
 	wp := wp.New(workers, taskCh, resCh, errCh, done, method, name)
-
 	app := newApp(wp, taskCh, resCh, errCh, done)
 	app.start = start
 	app.fileType = fileType
@@ -63,6 +59,7 @@ func (a *gofast) run() error {
 	var wgApp sync.WaitGroup
 	var wgWP sync.WaitGroup
 
+	wgWP.Add(1)
 	go a.wp.Start(&wgWP)
 
 	wgApp.Add(1)
@@ -74,6 +71,9 @@ func (a *gofast) run() error {
 	go a.listen()
 
 	wgApp.Wait()
+	close(a.taskCh)
+
+	wgWP.Wait() // Ждём завершения WorkerPool перед завершением программы
 
 	return nil
 }
@@ -87,15 +87,15 @@ func (a *gofast) listen() {
 				continue
 			}
 			log.Println(res)
-			a.logger.Info(res) // write info log
-		case err, ok := <-a.errorCh: // ignore
+			a.logger.Info(res)
+		case err, ok := <-a.errorCh:
 			if !ok {
 				a.errorCh = nil
 				continue
 			}
 			a.logger.Error(err)
 		case <-a.done:
-			log.Println("Worker finished")
+			return
 		}
 
 		if a.resultCh == nil && a.errorCh == nil {
@@ -105,8 +105,6 @@ func (a *gofast) listen() {
 }
 
 func (a *gofast) processDir(path string, wg *sync.WaitGroup) {
-	defer wg.Done()
-
 	entries, err := os.ReadDir(path)
 	if err != nil {
 		a.errorCh <- err
@@ -119,10 +117,12 @@ func (a *gofast) processDir(path string, wg *sync.WaitGroup) {
 		if entry.IsDir() {
 			if a.fileType == DIR {
 				a.taskCh <- fullPath
-				continue
 			}
 			wg.Add(1)
-			go a.processDir(fullPath, wg)
+			go func(p string) {
+				defer wg.Done()
+				a.processDir(p, wg)
+			}(fullPath)
 		} else if a.fileType == FILE {
 			a.taskCh <- fullPath
 		}
